@@ -1071,7 +1071,6 @@ _createcsr() {
     _info "Single domain" "$domain"
     printf -- "\nsubjectAltName=DNS:$domain" >>"$csrconf"
   else
-    domainlist="$(_idn "$domainlist")"
     _debug2 domainlist "$domainlist"
     if _contains "$domainlist" ","; then
       alt="DNS:$domain,DNS:$(echo "$domainlist" | sed "s/,,/,/g" | sed "s/,/,DNS:/g")"
@@ -1088,7 +1087,7 @@ _createcsr() {
     printf -- "\nbasicConstraints = CA:FALSE\n1.3.6.1.5.5.7.1.24=DER:30:03:02:01:05" >>"$csrconf"
   fi
 
-  _csr_cn="$(_idn "$domain")"
+  _csr_cn="$domain"
   _debug2 _csr_cn "$_csr_cn"
   if _contains "$(uname -a)" "MINGW"; then
     ${ACME_OPENSSL_BIN:-openssl} req -new -sha256 -key "$csrkey" -subj "//CN=$_csr_cn" -config "$csrconf" -out "$csr"
@@ -3393,7 +3392,7 @@ __get_domain_new_authz() {
   _authz_i=0
   while [ "$_authz_i" -lt "$_Max_new_authz_retry_times" ]; do
     _debug "Try new-authz for the $_authz_i time."
-    if ! _send_signed_request "${ACME_NEW_AUTHZ}" "{\"resource\": \"new-authz\", \"identifier\": {\"type\": \"dns\", \"value\": \"$(_idn "$_gdnd")\"}}"; then
+    if ! _send_signed_request "${ACME_NEW_AUTHZ}" "{\"resource\": \"new-authz\", \"identifier\": {\"type\": \"dns\", \"value\": \$_gdnd\"}}"; then
       _err "Can not get domain new authz."
       return 1
     fi
@@ -5741,9 +5740,13 @@ _process() {
             _err "'$_dvalue' is not a valid domain for parameter '$1'"
             return 1
           fi
-          if _is_idn "$_dvalue" && ! _exists idn; then
-            _err "It seems that $_dvalue is an IDN( Internationalized Domain Names), please install 'idn' command first."
-            return 1
+          if _is_idn "$_dvalue"; then
+            if ! _exists idn; then
+              _err "It seems that $_dvalue is an IDN( Internationalized Domain Names), please install 'idn' command first."
+              return 1
+            else
+              _dvalue="$(_idn "$_dvalue")"
+            fi
           fi
 
           if _startswith "$_dvalue" "*."; then
